@@ -1,0 +1,14 @@
+[2023-10-04 17:56:02,768] ERROR in app: Exception on /mapcheck [POST]
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/dist-packages/flask/app.py", line 2190, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/usr/local/lib/python3.10/dist-packages/flask/app.py", line 1486, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/usr/local/lib/python3.10/dist-packages/flask/app.py", line 1484, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/usr/local/lib/python3.10/dist-packages/flask/app.py", line 1469, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+  File "/home/cim/API/MAPCHECK/MAPCHECK_API.py", line 26, in mapcheck
+    mo = request.get_json()[0]['mo']
+KeyError: 'mo'
+10.21.20.76 - - [2023-10-04 17:56:02] "POST /mapcheck HTTP/1.1" 500 401 0.575415

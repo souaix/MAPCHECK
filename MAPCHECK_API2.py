@@ -1,78 +1,27 @@
-#!/usr/bin/env python
-# coding: utf-8
 from flask import Flask, jsonify, request
-
-from gevent import monkey
-monkey.patch_all()
-
-from gevent.pywsgi import WSGIServer
-from multiprocessing import cpu_count, Process
-from bottle import Bottle
-
 import json
+
 import sys
 import os
 from ftplib import FTP
 import datetime
 import pandas as pd
-#app = Bottle()
+from sqlalchemy import create_engine
+import pyodbc
+
 
 sys.path.append('/home/cim')
 # connector
 import connect.connect as cc
 
-import json
-import time
-
-import asyncio
-
-# sys.path.append('C:\\Users\\User\\Desktop\\python')
-import connect.connect as cc
-
-eng_cim_iot = cc.connect('CIM_ubuntu', 'iot')
-eng_mes = cc.connect('MES', 'MES_Production')
+eng_mes = cc.connect('MES', 'MES_Test')
 eng_cim = cc.connect('CIM_ubuntu', 'mapcheck')
 
 
-
-
 app = Flask(__name__)
-
 @app.route('/mapcheck/', methods=['POST'],strict_slashes=False)
 
 def mapcheck():
-
-    mo = request.get_json()[0]['mo']
-
-    sql ='''
-        select BASELOTNO,BARCODE,FILE_TYPE,AVIMAP_FILENAME from
-        (SELECT PRODUCTNO,BASELOTNO FROM TBLWIPLOTBASIS WHERE MONO =\''''+mo+'''\') as WIPBS
-        INNER JOIN
-        (select * from TBLPRDOP where opno ='S093_RW') as PRDOP
-        ON WIPBS.PRODUCTNO=PRDOP.PRODUCTNO
-        INNER JOIN
-        (select * from TBLPRDOPATTRIB where ATTRIBNO ='EXEFORXML' and ATTRIBVALUE='Y') as ATTR
-        on PRDOP.serialno = ATTR.SERIALNO
-        INNER JOIN
-        (select * from TBLPRDOPATTRIB where attribno = 'EQP_AUTOPROGRAM_CO' AND ATTRIBVALUE ='PROG00012') AS ATTCO
-        ON PRDOP.SERIALNO=ATTCO.SERIALNO    
-        LEFT JOIN
-        (select * from OPENQUERY(ERP,'select * from MES.VIEW_AVIMAP_FILE WHERE MO_NO =\'\''''+mo+'''''\') ) AS avimap
-        ON WIPBS.BASELOTNO COLLATE Chinese_Taiwan_Stroke_CI_AS = avimap.LOTNO
-        '''
-
-    df_PROG00012 = pd.read_sql(sql,eng_mes)
-    df_PROG00012.to_sql('PROG0012', eng_cim, if_exists='replace', index=False)
-    result = [{'Message':'OK','Qty':'None'}]
-    return jsonify(result)
-
-server_mc = WSGIServer(('10.21.98.21',7777),app,log=None)
-server_mc.start()
-
-########
-@app.route('/mapcheck_test/', methods=['POST'],strict_slashes=False)
-
-def mapcheck_test():
 
     # mo = request.get_json()[0]['mo']
     lotno = request.get_json()[0]['lotno']
@@ -134,7 +83,7 @@ def mapcheck_test():
                                 
                 #else => return MAPCHECK fail
                 else:
-                    result = [{'Result':'FAIL','Message':lotno+' in '+v+': cannot find '+FILETYPE[i]+', please check'}]
+                    result = [{'Result':'FAIL','Message':lotno+': cannot find '+FILETYPE[i]+', please check'}]
                     break
                     #PROGRAM is not existed
             else:
@@ -145,26 +94,14 @@ def mapcheck_test():
             result = [{'Result':'PASS','Message':v+',its have no EXEFORXML rule'}]
             # break
 
+
+
     return jsonify(result)
-
-server_mct = WSGIServer(('10.21.98.21',7770),app,log=None)
-server_mct.start()
-
-def server_forever():
-    server_mc.start_accepting()
-    server_mct.start_accepting()
-
-    server_mc._stop_event.wait()
-    server_mct._stop_event.wait()
-
-
-
 
 if __name__ == '__main__':
 
-	print('----')
-	for i in range(cpu_count()):
-		p = Process(target=server_forever)
-		p.start()
+    from gevent import pywsgi
 
-	
+    server = pywsgi.WSGIServer(('10.21.98.21',9999),app)
+    server.serve_forever()
+    
