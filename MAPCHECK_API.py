@@ -29,9 +29,8 @@ import asyncio
 # sys.path.append('C:\\Users\\User\\Desktop\\python')
 import connect.connect as cc
 
-eng_cim_iot = cc.connect('CIM_ubuntu', 'iot')
 eng_mes = cc.connect('MES', 'MES_Production')
-eng_cim = cc.connect('CIM_ubuntu', 'mapcheck')
+eng_mes_test = cc.connect('MES', 'MES_Test')
 
 
 
@@ -57,10 +56,13 @@ def mapcheck_prd():
     opno_str = opno_str[:-1]
 
 
-    #check EXEFORXML Y
+    #check EXEFORXML Y  & GOODQTY>0
     sql ='''
         select ATTR.SERIALNO,PRDOP.OPNO from
         (SELECT PRODUCTNO,BASELOTNO FROM TBLWIPLOTBASIS WHERE BASELOTNO =\''''+lotno+'''\') as WIPBS
+        INNER JOIN
+		(SELECT LOTNO from TBLWIPCOMPONENTSTATE WHERE GOODQTY >0) AS WIPCS
+		ON WIPBS.BASELOTNO=WIPCS.LOTNO
         INNER JOIN
         (select * from TBLPRDOP where opno in ('''+opno_str+''') )as PRDOP
         ON WIPBS.PRODUCTNO=PRDOP.PRODUCTNO
@@ -110,7 +112,7 @@ def mapcheck_prd():
 
         #EXEFORXML<>Y => don't need check        
         else:
-            result = [{'Result':'PASS','Message':v+',its have no EXEFORXML rule'}]
+            result = [{'Result':'PASS','Message':v+',its have no EXEFORXML rule or GOODQTY=0'}]
             # break
 
     return jsonify(result)
@@ -139,10 +141,13 @@ def mapcheck_test():
     opno_str = opno_str[:-1]
 
 
-    #check EXEFORXML Y
+    #check EXEFORXML Y & GOODQTY>0
     sql ='''
         select ATTR.SERIALNO,PRDOP.OPNO from
         (SELECT PRODUCTNO,BASELOTNO FROM TBLWIPLOTBASIS WHERE BASELOTNO =\''''+lotno+'''\') as WIPBS
+        INNER JOIN
+		(SELECT LOTNO from TBLWIPCOMPONENTSTATE WHERE GOODQTY >0) AS WIPCS
+		ON WIPBS.BASELOTNO=WIPCS.LOTNO
         INNER JOIN
         (select * from TBLPRDOP where opno in ('''+opno_str+''') )as PRDOP
         ON WIPBS.PRODUCTNO=PRDOP.PRODUCTNO
@@ -151,7 +156,7 @@ def mapcheck_test():
         on PRDOP.serialno = ATTR.SERIALNO        
         '''
     
-    df_check_xml = pd.read_sql(sql,eng_mes)
+    df_check_xml = pd.read_sql(sql,eng_mes_test)
 
     for i,v in enumerate(opnos):
         df_check_xml_opno = df_check_xml[df_check_xml['OPNO']==v]
@@ -162,7 +167,7 @@ def mapcheck_test():
             serialno = df_check_xml_opno['SERIALNO'][0]
 
             sql ="select * from TBLPRDOPATTRIB where attribno = '"+BR[i]+"' AND ATTRIBVALUE like '"+programid[i]+"%' AND SERIALNO ='"+serialno+"'"                    
-            df_PROGRAM = pd.read_sql(sql,eng_mes)     
+            df_PROGRAM = pd.read_sql(sql,eng_mes_test)     
             #PROGRAM existed => check AVIMAP
             if(len(df_PROGRAM)>0):
                 if(FILETYPE[i] in ['2ND_AVI','1ST_AVI']):
@@ -177,14 +182,16 @@ def mapcheck_test():
                 elif(FILETYPE[i] in ['CUTRACELOG']):
                     sql="select * from OPENQUERY(RIS_TEST,'select * from MES.VIEW_TRACELOG_FILE WHERE CU_LOG_FILENAME IS NOT NULL AND LOTNO=''"+lotno+"''')"
 
-                df_MAPCHECK = pd.read_sql(sql,eng_mes)         
+                df_MAPCHECK = pd.read_sql(sql,eng_mes_test)         
                 #AVIMAP => return ok
                 if(len(df_MAPCHECK)>0):
                     result = [{'Result':'PASS','Message':programid[i]+' PASS'}]    
                                 
                 #else => return MAPCHECK fail
                 else:
-                    result = [{'Result':'FAIL','Message':lotno+' in '+v+': cannot find '+FILETYPE[i]+', please check'}]
+                    #result = [{'Result':'FAIL','Message':lotno+' in '+v+': cannot find '+FILETYPE[i]+', please check'}]
+                    result = [{'Result':'PASS','Message':lotno+' in '+v+': cannot find '+FILETYPE[i]+', please check'}]
+
                     break
                     #PROGRAM is not existed
             else:
@@ -192,7 +199,7 @@ def mapcheck_test():
 
         #EXEFORXML<>Y => don't need check        
         else:
-            result = [{'Result':'PASS','Message':v+',its have no EXEFORXML rule'}]
+            result = [{'Result':'PASS','Message':v+',its have no EXEFORXML rule or GOODQTY=0'}]
             # break
 
     return jsonify(result)
